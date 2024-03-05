@@ -130,5 +130,5 @@ class Agglomerative_Cluster(ClusterBase):
         return self.agglomerative
 
     def get_score(self):
-        return silhouette_score(self.X_scaled, self.kmeans_mini.labels_)
+        return silhouette_score(self.X_scaled, self.agglomerative.labels_)
 
