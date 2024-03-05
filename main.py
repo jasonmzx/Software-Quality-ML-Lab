@@ -8,7 +8,7 @@ from clustering import KMeans_Cluster, Mini_KMeans_Cluster, Agglomerative_Cluste
 
 # Assuming KMeans_Cluster is defined as previously described
 
-kmeans_cluster = Agglomerative_Cluster("./iris.csv")
+kmeans_cluster = Mini_KMeans_Cluster("./iris.csv")
 pca_data = kmeans_cluster.get_pca_data()
 centroids = kmeans_cluster.get_centroids()
 
@@ -27,7 +27,7 @@ plt.scatter(pca_data[:, 0],
 # Plotting the cluster centers
 plt.scatter(centroids[:, 0], centroids[:, 1], c='red', marker='X', s=200, label='Centroids')
 
-plt.title('Agglomerative Cluster of Iris Dataset (PCA-reduced)')
+plt.title('KMeans  Cluster of Iris Dataset (PCA-reduced)')
 plt.xlabel('PCA Component 1')
 plt.ylabel('PCA Component 2')
 plt.legend()

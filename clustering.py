@@ -1,30 +1,57 @@
+#* Code By: Jason Manarroo | 100825106
+
 import pandas as pd
 from sklearn.cluster import KMeans, MiniBatchKMeans, AgglomerativeClustering
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-
 import numpy as np
 
-#* Code By: Jason Manarroo | 100825106
+from abc import ABC, abstractmethod
+from sklearn.metrics import silhouette_score
 
-class KMeans_Cluster:
+
+# Base Class AKA Interface
+
+class ClusterBase(ABC):
     def __init__(self, filename: str):
-        # Load the dataset
-        self.iris_data = pd.read_csv(filename)
+        self.csv_data = pd.read_csv(filename)
 
-        # Split all the Numerical Data, from Catergorical String Data
-        X = self.iris_data.iloc[:, :-1].values
+        #Seperates Numerical Data from Categoric, As last Column is labels (For later performance testing, etc...)
+        X = self.csv_data.iloc[:, :-1].values
 
-        # Scaling the features
         scaler = StandardScaler()
         self.X_scaled = scaler.fit_transform(X)
+        self.pca = PCA(n_components=2)  # Initialize here, but fit in subclasses
 
-        # K-Means clustering
+    @abstractmethod
+    def get_pca_data(self):
+        pass
+
+    @abstractmethod
+    def get_centroids(self):
+        pass
+
+    @abstractmethod
+    def get_labels(self):
+        pass
+
+    @abstractmethod
+    def get_clust_obj(self):
+        pass
+
+    @abstractmethod
+    def get_score(self):
+        pass
+
+#* ---------------------------------- // Clustering Algorithm Class Impls (using ClusterBase) // -------------------
+
+class KMeans_Cluster(ClusterBase):
+    def __init__(self, filename: str):
+        super().__init__(filename)  # Initialize the base class
+
         self.kmeans = KMeans(n_clusters=3, random_state=42)
-        self.kmeans.fit_predict(self.X_scaled)
+        self.kmeans.fit(self.X_scaled)
         
-        # Perform PCA for dimensionality reduction to visualize in 2D
-        self.pca = PCA(n_components=2)
         self.X_pca = self.pca.fit_transform(self.X_scaled)
 
     def get_pca_data(self):
@@ -32,68 +59,76 @@ class KMeans_Cluster:
 
     def get_centroids(self):
         return self.pca.transform(self.kmeans.cluster_centers_)
+
+    def get_labels(self):
+        return self.kmeans.labels_
     
-    def get_clust_obj(self): # Gives Main or test fn. the cluster object
+    def get_clust_obj(self):
         return self.kmeans
 
+    def get_score(self):
+        return silhouette_score(self.X_scaled, self.kmeans.labels_)
+    
+    def get_inertia(self): #* ONLY FOR K-MEANS VARIANTS, as it relies on accurate centroid
+        return self.kmeans.inertia_
 
-
-class Mini_KMeans_Cluster:
+class Mini_KMeans_Cluster(ClusterBase):
     def __init__(self, filename: str):
-        self.iris_data = pd.read_csv(filename)
-        X = self.iris_data.iloc[:, :-1].values
-        
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
-        
+        super().__init__(filename)  # Base class initialization
+
         self.kmeans_mini = MiniBatchKMeans(n_clusters=3, random_state=42)
-        self.kmeans_mini.fit_predict(X_scaled)
+        self.kmeans_mini.fit(self.X_scaled)
         
-        pca = PCA(n_components=2)
-        self.X_pca = pca.fit_transform(X_scaled)
-        
-        self.centroids = pca.transform(self.kmeans_mini.cluster_centers_)
+        self.X_pca = self.pca.fit_transform(self.X_scaled)
 
     def get_pca_data(self):
         return self.X_pca
 
     def get_centroids(self):
-        return self.centroids
+        return self.pca.transform(self.kmeans_mini.cluster_centers_)
 
-    def get_clust_obj(self): # Gives Main or test fn. the cluster object
+    def get_labels(self):
+        return self.kmeans_mini.labels_
+    
+    def get_clust_obj(self):
         return self.kmeans_mini
 
-class Agglomerative_Cluster:
-    def __init__(self, filename: str):
-        self.iris_data = pd.read_csv(filename)
-        X = self.iris_data.iloc[:, :-1].values
-        
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
-        
-        self.agglomerative = AgglomerativeClustering(n_clusters=3)
-        self.cluster_labels = self.agglomerative.fit_predict(X_scaled)
-        
-        pca = PCA(n_components=2)
-        self.X_pca = pca.fit_transform(X_scaled)
-        
-        # Since AgglomerativeClustering doesn't directly provide cluster centers, we calculate them
-        self.centroids = self.calculate_centroids(X_scaled)
+    def get_score(self):
+        return silhouette_score(self.X_scaled, self.kmeans_mini.labels_)
 
-    def calculate_centroids(self, X_scaled):
-        centroids = np.zeros((3, X_scaled.shape[1]))
+    def get_inertia(self): #* ONLY FOR K-MEANS VARIANTS, as it relies on accurate centroid
+        return self.kmeans_mini.inertia_
+
+class Agglomerative_Cluster(ClusterBase):
+    def __init__(self, filename: str):
+        super().__init__(filename)  # Base class initialization
+
+        self.agglomerative = AgglomerativeClustering(n_clusters=3)
+        self.cluster_labels = self.agglomerative.fit_predict(self.X_scaled)
+        
+        self.X_pca = self.pca.fit_transform(self.X_scaled)
+        self.centroids = self.calculate_centroids()
+
+    def calculate_centroids(self):
+        centroids = np.zeros((3, self.X_scaled.shape[1]))
         for i in range(3):
-            cluster = X_scaled[self.cluster_labels == i]
+            cluster = self.X_scaled[self.cluster_labels == i]
             cluster_mean = cluster.mean(axis=0)
             centroids[i, :] = cluster_mean
-        return PCA(n_components=2).fit_transform(centroids)
+        return self.pca.transform(centroids)
 
     def get_pca_data(self):
         return self.X_pca
 
     def get_centroids(self):
         return self.centroids
+
+    def get_labels(self):
+        return self.cluster_labels
     
-    def get_clust_obj(self): # Gives Main or test fn. the cluster object
+    def get_clust_obj(self):
         return self.agglomerative
+
+    def get_score(self):
+        return silhouette_score(self.X_scaled, self.kmeans_mini.labels_)
 
